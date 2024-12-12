@@ -10,6 +10,9 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include <iostream>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #ifdef _WIN32
 #    define WIN32_LEAN_AND_MEAN
@@ -449,11 +452,19 @@ static std::string backend_filename_suffix() {
 #endif
 }
 
-static ggml_backend_reg_t ggml_backend_load_best(const char * name, bool silent, const char * user_search_path) {
-    // enumerate all the files that match [lib]ggml-name-*.[so|dll] in the search paths
-     // TODO: search system paths
+inline bool is_regular_file(const std::string& path) {
+    struct stat path_stat;
+    if (stat(path.c_str(), &path_stat) != 0) {
+        return false;
+    }
+    return S_ISREG(path_stat.st_mode);
+}
+
+// Updated function
+static ggml_backend_reg_t ggml_backend_load_best(const char* name, bool silent, const char* user_search_path) {
     std::string file_prefix = backend_filename_prefix() + name + "-";
     std::vector<std::string> search_paths;
+    
     if (user_search_path == nullptr) {
         search_paths.push_back("./");
         search_paths.push_back(get_executable_path());
@@ -464,57 +475,60 @@ static ggml_backend_reg_t ggml_backend_load_best(const char * name, bool silent,
         search_paths.push_back(std::string(user_search_path) + "/");
 #endif
     }
-
+    
     int best_score = 0;
     std::string best_path;
-
-    namespace fs = std::filesystem;
-    for (const auto & search_path : search_paths) {
-        if (!fs::exists(search_path)) {
+    
+    for (const auto& search_path : search_paths) {
+        DIR* dir = opendir(search_path.c_str());
+        if (!dir) {
             continue;
         }
-        for (const auto & entry : fs::directory_iterator(search_path)) {
-            if (entry.is_regular_file()) {
-                std::string filename = entry.path().filename().string();
-                std::string ext = entry.path().extension().string();
-                if (filename.find(file_prefix) == 0 && ext == backend_filename_suffix()) {
-                    dl_handle_ptr handle { dl_load_library(entry.path().c_str()) };
-                    if (!handle && !silent) {
-                        GGML_LOG_ERROR("%s: failed to load %s\n", __func__, entry.path().string().c_str());
-                    }
-                    if (handle) {
-                        auto score_fn = (ggml_backend_score_t) dl_get_sym(handle.get(), "ggml_backend_score");
-                        if (score_fn) {
-                            int s = score_fn();
+        
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            std::string filename = entry->d_name;
+            std::string full_path = search_path + filename;
+            
+            if (is_regular_file(full_path) &&
+                filename.find(file_prefix) == 0 &&
+                filename.substr(filename.find_last_of('.')) == backend_filename_suffix()) {
+                dl_handle_ptr handle{ dl_load_library(full_path.c_str()) };
+                if (!handle && !silent) {
+                    GGML_LOG_ERROR("%s: failed to load %s\n", __func__, full_path.c_str());
+                }
+                if (handle) {
+                    auto score_fn = (ggml_backend_score_t)dl_get_sym(handle.get(), "ggml_backend_score");
+                    if (score_fn) {
+                        int s = score_fn();
 #ifndef NDEBUG
-                            GGML_LOG_DEBUG("%s: %s score: %d\n", __func__, entry.path().string().c_str(), s);
+                        GGML_LOG_DEBUG("%s: %s score: %d\n", __func__, full_path.c_str(), s);
 #endif
-                            if (s > best_score) {
-                                best_score = s;
-                                best_path = entry.path().string();
-                            }
-                        } else {
-                            if (!silent) {
-                                GGML_LOG_INFO("%s: failed to find ggml_backend_score in %s\n", __func__, entry.path().string().c_str());
-                            }
+                        if (s > best_score) {
+                            best_score = s;
+                            best_path = full_path;
+                        }
+                    } else {
+                        if (!silent) {
+                            GGML_LOG_INFO("%s: failed to find ggml_backend_score in %s\n", __func__, full_path.c_str());
                         }
                     }
                 }
             }
         }
+        closedir(dir);
     }
-
+    
     if (best_score == 0) {
-        // try to load the base backend
-        for (const auto & search_path : search_paths) {
+        for (const auto& search_path : search_paths) {
             std::string path = search_path + backend_filename_prefix() + name + backend_filename_suffix();
-            if (fs::exists(path)) {
+            if (is_regular_file(path)) {
                 return get_reg().load_backend(path.c_str(), silent);
             }
         }
         return nullptr;
     }
-
+    
     return get_reg().load_backend(best_path.c_str(), silent);
 }
 
