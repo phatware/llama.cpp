@@ -488,9 +488,13 @@ static std::wstring path_separator() {
 #endif
 }
 
-inline bool is_regular_file(const std::string& path) {
+inline bool is_regular_file(const std::wstring& path) {
+    // Convert wide string to UTF-8 string for compatibility
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+    std::string utf8_path = converter.to_bytes(path);
+
     struct stat path_stat;
-    if (stat(path.c_str(), &path_stat) != 0) {
+    if (stat(utf8_path.c_str(), &path_stat) != 0) {
         return false;
     }
     return S_ISREG(path_stat.st_mode);
@@ -498,8 +502,8 @@ inline bool is_regular_file(const std::string& path) {
 
 // Updated function
 static ggml_backend_reg_t ggml_backend_load_best(const char* name, bool silent, const char* user_search_path) {
-    std::string file_prefix = backend_filename_prefix() + name + "-";
-    std::vector<std::string> search_paths;
+    std::wstring file_prefix = backend_filename_prefix() + utf8_to_utf16(name) + L"-";
+    std::vector<std::wstring> search_paths;
     
     if (user_search_path == nullptr) {
         search_paths.push_back(L"." + path_separator());
@@ -509,18 +513,19 @@ static ggml_backend_reg_t ggml_backend_load_best(const char* name, bool silent, 
     }
     
     int best_score = 0;
-    std::string best_path;
+    std::wstring best_path;
     
     for (const auto& search_path : search_paths) {
-        DIR* dir = opendir(search_path.c_str());
+        std::string utf8_path = utf16_to_utf8(search_path);
+        DIR* dir = opendir(utf8_path.c_str());
         if (!dir) {
             continue;
         }
 
         struct dirent* entry;
         while ((entry = readdir(dir)) != nullptr) {
-            std::string filename = entry->d_name;
-            std::string full_path = search_path + filename;
+            std::wstring filename = utf8_to_utf16(entry->d_name);
+            std::wstring full_path = search_path + filename;
             
             if (is_regular_file(full_path) &&
                 filename.find(file_prefix) == 0 &&
@@ -534,7 +539,7 @@ static ggml_backend_reg_t ggml_backend_load_best(const char* name, bool silent, 
                     if (score_fn) {
                         int s = score_fn();
 #ifndef NDEBUG
-                        GGML_LOG_DEBUG("%s: %s score: %d\n", __func__, full_path.c_str(), s);
+                        GGML_LOG_DEBUG("%s: %s score: %d\n", __func__, utf16_to_utf8(entry.path().wstring()).c_str(), s);
 #endif
                         if (s > best_score) {
                             best_score = s;
@@ -542,7 +547,7 @@ static ggml_backend_reg_t ggml_backend_load_best(const char* name, bool silent, 
                         }
                     } else {
                         if (!silent) {
-                            GGML_LOG_INFO("%s: failed to find ggml_backend_score in %s\n", __func__, full_path.c_str());
+                            GGML_LOG_INFO("%s: failed to find ggml_backend_score in %s\n", __func__, utf16_to_utf8(full_path).c_str());
                         }
                     }
                 }
@@ -553,7 +558,7 @@ static ggml_backend_reg_t ggml_backend_load_best(const char* name, bool silent, 
     
     if (best_score == 0) {
         for (const auto& search_path : search_paths) {
-            std::string path = search_path + backend_filename_prefix() + name + backend_filename_suffix();
+            std::wstring path = search_path + backend_filename_prefix() + utf8_to_utf16(name) + backend_filename_suffix();
             if (is_regular_file(path)) {
                 return get_reg().load_backend(path.c_str(), silent);
             }
