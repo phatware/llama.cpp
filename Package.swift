@@ -23,6 +23,7 @@ var sources = [
     "src/unicode.cpp",
     "src/unicode-data.cpp",
     "ggml/src/ggml.c",
+    "ggml/src/gguf.cpp",
     "ggml/src/ggml-alloc.c",
     "ggml/src/ggml-backend.cpp",
     "ggml/src/ggml-backend-reg.cpp",
@@ -41,6 +42,7 @@ var cSettings: [CSetting] =  [
     .unsafeFlags(["-Wno-shorten-64-to-32", "-O3", "-DNDEBUG"]),
     .unsafeFlags(["-fno-objc-arc"]),
     .headerSearchPath("ggml/src"),
+    .headerSearchPath("ggml/include"),
     .headerSearchPath("ggml/src/ggml-cpu"),
     // NOTE: NEW_LAPACK will required iOS version 16.4+
     // We should consider add this in the future when we drop support for iOS 14
@@ -54,6 +56,7 @@ var cxxSettings: [CXXSetting] = [
     .unsafeFlags(["-std=c++17", "-Wno-shorten-64-to-32", "-O3", "-DNDEBUG"]),
     .unsafeFlags(["-fno-objc-arc"]),
     .headerSearchPath("ggml/src"),
+    .headerSearchPath("ggml/include"),
     .headerSearchPath("ggml/src/ggml-cpu")
 ]
 
