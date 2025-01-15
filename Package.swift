@@ -72,6 +72,13 @@ cSettings.append(
         .define("GGML_USE_CPU")
     ]
 )
+cxxSettings.append(
+    contentsOf: [
+        .define("GGML_USE_ACCELERATE"),
+        .define("GGML_USE_METAL"),
+        .define("GGML_USE_CPU")
+    ]
+)
 #endif
 
 #if os(Linux)
