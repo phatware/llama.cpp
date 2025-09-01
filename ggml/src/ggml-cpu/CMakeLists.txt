@@ -70,10 +70,12 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
     if (GGML_OPENMP)
         find_package(OpenMP)
         if (OpenMP_FOUND)
+            set(GGML_OPENMP_ENABLED "ON" CACHE INTERNAL "")
             target_compile_definitions(${GGML_CPU_NAME} PRIVATE GGML_USE_OPENMP)
 
             target_link_libraries(${GGML_CPU_NAME} PRIVATE OpenMP::OpenMP_C OpenMP::OpenMP_CXX)
         else()
+            set(GGML_OPENMP_ENABLED "OFF" CACHE INTERNAL "")
             message(WARNING "OpenMP not found")
         endif()
     endif()
@@ -433,7 +435,7 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
             )
         if (GGML_RVV)
             if (GGML_XTHEADVECTOR)
-                list(APPEND ARCH_FLAGS -march=rv64gc_xtheadvector -mabi=lp64d)
+                list(APPEND ARCH_FLAGS -march=rv64gc_zfhmin_xtheadvector -mabi=lp64d)
             elseif (GGML_RV_ZFH)
                 list(APPEND ARCH_FLAGS -march=rv64gcv_zfhmin -mabi=lp64d)
             else()
@@ -456,8 +458,9 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
             list(APPEND ARCH_FLAGS -march=z16)
         elseif (${S390X_M} MATCHES "9175|9176")
             # NOTE: Only available from GCC 15.1.0 onwards. Any z17 machine with compile issues must first verify their GCC version.
+            #       binutils must also be updated to the latest for the -march=z17 flag to work. Otherwise, use -march=arch15.
             message(STATUS "z17 target")
-            list(APPEND ARCH_FLAGS -march=z17)
+            list(APPEND ARCH_FLAGS -march=arch15)
         else()
             message(STATUS "Unknown target")
             message(WARNING "Unknown target. If you are compiling for z14 and earlier, you might have to add -DGGML_VXE=OFF.")
@@ -494,9 +497,9 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
 
         # Fetch KleidiAI sources:
         include(FetchContent)
-        set(KLEIDIAI_COMMIT_TAG "v1.9.0")
+        set(KLEIDIAI_COMMIT_TAG "v1.13.0")
         set(KLEIDIAI_DOWNLOAD_URL "https://github.com/ARM-software/kleidiai/archive/refs/tags/${KLEIDIAI_COMMIT_TAG}.tar.gz")
-        set(KLEIDIAI_ARCHIVE_MD5  "2a8e1bb55d201557553545536489a017")
+        set(KLEIDIAI_ARCHIVE_MD5  "d82a8de939d9814621a5ba23907bdac1")
 
         if (POLICY CMP0135)
             cmake_policy(SET CMP0135 NEW)
@@ -552,6 +555,7 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
 
         list(APPEND GGML_KLEIDIAI_SOURCES
             ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_lhs_quant_pack_qsi8d32p_f32.c
+            ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_lhs_quant_pack_qsi8d32p4x8sb_f32_neon.c
             ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_rhs_pack_nxk_qsi4c32ps1s0scalef16_qsu4c32s16s0_neon.c
             ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_lhs_quant_pack_qsi8d32p_f32_neon.c
             ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_rhs_pack_nxk_qsi4c32pscalef16_qsu4c32s16s0.c)
@@ -573,7 +577,8 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
                 ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qsi8d32p_qsi4c32p/kai_matmul_clamp_f32_qsi8d32p1x4_qsi4c32p4vlx4_1x4vl_sme2_sdot.c
                 ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_fp32_bf16p_bf16p/kai_matmul_clamp_f32_bf16p2vlx2_bf16p2vlx2_2vlx2vl_sme2_mopa.c
                 ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_lhs_pack_bf16p2vlx2_f32_sme.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_rhs_pack_kxn_bf16p2vlx2b_f32_x32_sme.c)
+                ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_rhs_pack_kxn_bf16p2vlx2b_f32_x32_sme.c
+                ${KLEIDIAI_SRC}/kai/kai_common_sme_asm.S)
             set(PRIVATE_ARCH_FLAGS "-fno-tree-vectorize;${PRIVATE_ARCH_FLAGS}+sve+sve2")
         endif()
 

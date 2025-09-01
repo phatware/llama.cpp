@@ -16,6 +16,9 @@
 # # with VULKAN support
 # GG_BUILD_VULKAN=1 bash ./ci/run.sh ./tmp/results ./tmp/mnt
 #
+# # with WebGPU support
+# GG_BUILD_WEBGPU=1 bash ./ci/run.sh ./tmp/results ./tmp/mnt
+#
 # # with MUSA support
 # GG_BUILD_MUSA=1 bash ./ci/run.sh ./tmp/results ./tmp/mnt
 #
@@ -81,6 +84,10 @@ if [ ! -z ${GG_BUILD_VULKAN} ]; then
     CMAKE_EXTRA="${CMAKE_EXTRA} -DGGML_VULKAN=1"
 fi
 
+if [ ! -z ${GG_BUILD_WEBGPU} ]; then
+    CMAKE_EXTRA="${CMAKE_EXTRA} -DGGML_WEBGPU=1"
+fi
+
 if [ ! -z ${GG_BUILD_MUSA} ]; then
     # Use qy1 by default (MTT S80)
     MUSA_ARCH=${MUSA_ARCH:-21}
@@ -99,7 +106,7 @@ function gg_wget {
     cd $out
 
     # should not re-download if file is the same
-    wget -nv -N $url
+    wget -nv -c -N $url
 
     cd $cwd
 }
@@ -379,10 +386,10 @@ function gg_run_open_llama_7b_v2 {
 
     (time ./bin/llama-imatrix --model ${model_f16} -f ${wiki_test} -t 1 -ngl 99 -c 2048 -b 512 --chunks 4 ) 2>&1 | tee -a $OUT/${ci}-imatrix.log
 
-    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 10 -c 0     ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
-    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 10 -c 0 -fa ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
-    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 99 -c 0     ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
-    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 99 -c 0 -fa ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
+    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 10 -c 0 -fa off ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
+    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 10 -c 0 -fa on  ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
+    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 99 -c 0 -fa off ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
+    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 99 -c 0 -fa on  ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
 
     function check_ppl {
         qnt="$1"
@@ -513,8 +520,8 @@ function gg_run_pythia_1_4b {
 
     (time ./bin/llama-imatrix --model ${model_f16} -f ${wiki_test_60} -ngl 99 -c 128 -b 128 --chunks 1 ) 2>&1 | tee -a $OUT/${ci}-imatrix.log
 
-    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 99 -c 0     ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
-    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 99 -c 0 -fa ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
+    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 99 -c 0 -fa off ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
+    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 99 -c 0 -fa on  ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
 
     function check_ppl {
         qnt="$1"
@@ -644,10 +651,10 @@ function gg_run_pythia_2_8b {
 
     (time ./bin/llama-imatrix --model ${model_f16} -f ${wiki_test} -t 1 -ngl 99 -c 2048 -b 512 --chunks 4 ) 2>&1 | tee -a $OUT/${ci}-imatrix.log
 
-    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 10 -c 0     ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
-    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 10 -c 0 -fa ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
-    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 99 -c 0     ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
-    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 99 -c 0 -fa ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
+    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 10 -c 0 -fa off ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
+    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 10 -c 0 -fa on  ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
+    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 99 -c 0 -fa off ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
+    (time ./bin/llama-save-load-state --model ${model_q4_0} -ngl 99 -c 0 -fa on  ) 2>&1 | tee -a $OUT/${ci}-save-load-state.log
 
     function check_ppl {
         qnt="$1"
